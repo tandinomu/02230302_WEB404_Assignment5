@@ -1,4 +1,5 @@
 <?php require __DIR__ . '/config.php';
+require __DIR__ . '/csrf.php';
 
 // Guard: only logged-in users may view this page.
 if (empty($_SESSION['user'])) {
@@ -28,6 +29,13 @@ if (empty($_SESSION['user'])) {
     really came from this page: no secret token, nothing unguessable.
   -->
   <form method="POST" action="/change_email.php">
+    <!--
+      THE FIX (part 1): embed the session's secret CSRF token as a hidden
+      field. Only pages served by SecureBank can read this value, because
+      the attacker's site is a different origin and the browser's
+      same-origin policy stops it from reading our page's contents.
+    -->
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
     <p><input name="email" placeholder="new email" style="width:100%"></p>
     <p><button type="submit">Update email</button></p>
   </form>
