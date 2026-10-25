@@ -1,0 +1,23 @@
+# Two separate web servers so we can demonstrate a *cross-site* attack.
+# Both are bound to 127.0.0.1 only, so nothing is exposed to the network
+# (ethical requirement: this lab must never be reachable from outside).
+services:
+  # The VICTIM: a small "bank/account" app with a login and a session cookie.
+  # We reach it in the browser as http://localhost:8090
+  victim:
+    image: php:8.2-apache
+    container_name: csrf_victim
+    ports:
+      - "127.0.0.1:8090:80"      # host 127.0.0.1:8090  ->  container port 80
+    volumes:
+      - ./victim:/var/www/html   # serve the files in ./victim
+
+  # The ATTACKER: a completely separate site on a different origin.
+  # We reach it in the browser as http://127.0.0.1:9090
+  attacker:
+    image: php:8.2-apache
+    container_name: csrf_attacker
+    ports:
+      - "127.0.0.1:9090:80"
+    volumes:
+      - ./attacker:/var/www/html
