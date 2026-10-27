@@ -6,6 +6,28 @@
 
 ---
 
+## Overview — what this assignment does and how
+
+This assignment demonstrates **Cross-Site Request Forgery (CSRF)** end to end:
+first by building a form that is vulnerable to it, then by fixing it with CSRF
+tokens.
+
+The approach has four stages:
+
+1. **Build two websites** — a victim app ("SecureBank") with a login, and a
+   separate attacker site on a different origin. Two sites are needed because
+   CSRF is a *cross-site* attack.
+2. **Build a vulnerable action** — a "change email" form on the victim that is
+   protected by nothing but the session cookie.
+3. **Attack it** — the attacker site silently forges a request that changes the
+   victim's email while they are logged in, proving the danger.
+4. **Fix it** — add a secret CSRF token to the form and verify it on the server,
+   then show the same attack now fails while normal use still works.
+
+Everything runs locally in Docker, bound to `127.0.0.1` only.
+
+---
+
 ## 1. What is CSRF?
 
 **Cross-Site Request Forgery (CSRF)** tricks a logged-in user's browser into
@@ -13,15 +35,15 @@ sending a request they never meant to send.
 
 It works because of one browser rule: **the browser automatically attaches a
 site's cookies to every request going to that site — even when another website
-started the request.** So if I am logged into my bank and then visit a bad
-website, that bad website can make my browser send a request to my bank, and my
-bank's session cookie goes along automatically.
+started the request.** So if a user is logged into their bank and then visits a
+bad website, that bad website can make the browser send a request to the bank,
+and the bank's session cookie goes along automatically.
 
 The attacker never sees the response and never steals the cookie. They only need
 the *action* to happen — email changed, money moved, password reset.
 
-**Impact:** account takeover (change my email → reset my password), money
-transfer, changing settings — any action I am allowed to do.
+**Impact:** account takeover (change the email → reset the password), money
+transfer, changing settings — any action the user is allowed to do.
 
 **OWASP:** CSRF was its own category (A8) in the OWASP Top Ten 2013; in 2021 it
 is part of **A01 – Broken Access Control**. See the
@@ -31,7 +53,7 @@ is part of **A01 – Broken Access Control**. See the
 
 ## 2. Lab setup (two websites)
 
-CSRF is a *cross-site* attack, so I need **two separate websites**:
+CSRF is a *cross-site* attack, so the lab uses **two separate websites**:
 
 | Role | Address |
 |------|---------|
@@ -48,7 +70,7 @@ origin**. This matters twice:
   victim's pages — which later stops it from stealing the CSRF token.
 
 **Ethics:** both ports are bound to `127.0.0.1` only, so nothing is reachable
-from the network. The attack only targets my own practice app with fake data.
+from the network. The attack only targets a local practice app with fake data.
 
 **Run it:**
 ```bash
@@ -62,8 +84,8 @@ docker compose down   # stop
 
 ## 3. Step 1 — The form works normally
 
-Logged in as `alice`, I change my email using the form. It updates — this is the
-feature working as intended.
+Logged in as `alice`, the email is changed using the form. It updates — this is
+the feature working as intended.
 
 ![Normal email change](screenshots/01_normal_change.png)
 
@@ -84,8 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ```
 
-The cookie tells the server *who* I am, but **not** whether the request really
-came from SecureBank's own page. That is the hole.
+**What this code does:** if the request is a POST, it reads the `email` field and
+saves it to the session, then redirects back to the account page. The only thing
+it relies on is the session cookie. It never checks whether the request came from
+SecureBank's own page. The cookie proves *who* the user is, but not *where the
+request came from* — and that is the hole.
 
 ---
 
@@ -103,8 +128,10 @@ to the victim as soon as the page loads:
 </script>
 ```
 
-The victim just sees "Congratulations!" flash for a split second. The forged
-request fires silently.
+**What this code does:** it defines a form aimed at the victim's `change_email.php`
+with the attacker's email pre-filled in a hidden field, and the script submits it
+automatically when the page loads. The victim just sees "Congratulations!" flash
+for a split second while the forged request fires silently.
 
 ![Attacker page source](screenshots/03_attacker_page.png)
 
@@ -115,15 +142,15 @@ request fires silently.
 **Steps:** (1) log into SecureBank as `alice`, (2) in the same browser, open the
 attacker site `http://127.0.0.1:9090`.
 
-The hidden form submits, the browser attaches my SecureBank cookie, and my email
-is changed to `attacker@evil.example` — **without my consent**. The browser even
-lands back on SecureBank's account page showing the new email.
+The hidden form submits, the browser attaches the SecureBank cookie, and the
+email is changed to `attacker@evil.example` — **without consent**. The browser
+even lands back on SecureBank's account page showing the new email.
 
 ![Attack succeeds](screenshots/02_attack_success.png)
 
 **Why it worked:**
-- I have a live session → my browser holds SecureBank's cookie.
-- The attacker page tells my browser to POST to SecureBank.
+- The user has a live session → the browser holds SecureBank's cookie.
+- The attacker page tells the browser to POST to SecureBank.
 - The browser **auto-attaches the cookie**, no matter who started the request.
 - The server sees a valid cookie and cannot tell the forged request from a real
   one, because the real form carries nothing secret.
@@ -151,12 +178,20 @@ function csrf_check(?string $submitted): bool {
 }
 ```
 
+**What this code does:** `csrf_token()` creates one random 64-character token the
+first time it is needed and stores it in the session (so the same token is reused
+for that user). `csrf_check()` returns true only if the token sent with the form
+matches the one in the session. `hash_equals()` compares them in constant time so
+an attacker cannot guess the token by measuring response times.
+
 **(b) Put the token in the real form (`account.php`):**
 ```php
 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
 ```
 
-The token is a long random value in the page. The attacker cannot read it.
+**What this code does:** it adds the session's token as a hidden field so every
+genuine submission carries it. The attacker cannot read this value because it is
+on a different origin.
 
 ![Token in page source](screenshots/07_token_in_source.png)
 
@@ -168,16 +203,20 @@ if (!csrf_check($_POST['csrf_token'] ?? null)) {
 }
 ```
 
+**What this code does:** before changing anything, it verifies the token. If the
+token is missing or wrong (as in a forged request), it replies `403 Forbidden`
+and stops, so no change is made.
+
 ---
 
 ## 8. Step 6 — The same attack now fails
 
-I run the **exact same attack** (attacker page unchanged). This time it is
-rejected with HTTP 403:
+Running the **exact same attack** (attacker page unchanged) is now rejected with
+HTTP 403:
 
 ![Attack blocked](screenshots/05_attack_blocked.png)
 
-My email is left unchanged:
+The email is left unchanged:
 
 ![Email unchanged](screenshots/06_email_unchanged.png)
 
@@ -207,28 +246,28 @@ The real form still works, because it carries the token:
 ```
 
 ### Defence in depth (layers)
-1. **CSRF token** *(what I built)* — a secret the attacker cannot read. Main fix.
+1. **CSRF token** *(implemented here)* — a secret the attacker cannot read. Main fix.
 2. **`SameSite` cookies** — `SameSite=Lax` (modern default) already blocks
-   cross-site POSTs. I set `SameSite=None` on purpose so the attack could be
-   shown; in production you use `Lax` **and** tokens together.
-3. **Origin/Referer check** — reject requests not coming from my own site. A
+   cross-site POSTs. This lab sets `SameSite=None` on purpose so the attack could
+   be shown; in production you use `Lax` **and** tokens together.
+3. **Origin/Referer check** — reject requests not coming from the site itself. A
    supporting check, not the only one.
 
 ### CSRF vs XSS (why they differ)
-- **CSRF**: attacker makes my browser send a request but never sees the response
-  or runs code on the site.
-- **XSS**: attacker runs their own JavaScript *inside* the site's origin.
-- **XSS breaks CSRF tokens**: if attacker JS runs on the site, it can read the
-  token and send a valid request. So tokens assume no XSS — you must fix both.
+- **CSRF**: the attacker makes the browser send a request but never sees the
+  response or runs code on the site.
+- **XSS**: the attacker runs their own JavaScript *inside* the site's origin.
+- **XSS breaks CSRF tokens**: if attacker JavaScript runs on the site, it can read
+  the token and send a valid request. So tokens assume no XSS — both must be fixed.
 
 ---
 
 ## 10. Conclusion
 
 A session cookie proves *who* the user is, but not that the request came from the
-site's own page. I showed a separate attacker site silently changing a logged-in
-user's email, then stopped it with a CSRF token: the same attack failed (403)
-while normal use still worked. Tokens are the core defence, backed up by
+site's own page. This lab showed a separate attacker site silently changing a
+logged-in user's email, then stopped it with a CSRF token: the same attack failed
+(403) while normal use still worked. Tokens are the core defence, backed up by
 `SameSite` cookies, Origin checks, and keeping the site free of XSS.
 
 ---
