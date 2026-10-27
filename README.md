@@ -284,3 +284,12 @@ screenshots/           evidence 01–07
 
 The git history follows the same order: vulnerable app → attacker page → fix.
 Run `git log --oneline` and `git show <commit>` to see the vulnerable version.
+
+---
+
+## References
+
+- OWASP Top 10:2021, A01 Broken Access Control, https://owasp.org/Top10/A01_2021-Broken_Access_Control/
+- OWASP CSRF Prevention Cheat Sheet, https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+- MDN, Set-Cookie (SameSite, HttpOnly, Secure), https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie
+- MDN, Same-origin policy, https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy
