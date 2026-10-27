@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // No valid token -> reject the request and change nothing.
     if (!csrf_check($_POST['csrf_token'] ?? null)) {
         http_response_code(403);
-        exit('CSRF token missing or invalid — request rejected.');
+        exit('CSRF token missing or invalid. Request rejected.');
     }
 
     // Token is valid: this really is our logged-in user acting through our
