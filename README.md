@@ -6,7 +6,7 @@
 
 ---
 
-## Overview: what this assignment does and how
+## Overview: What this assignment does and how
 
 This assignment demonstrates **Cross-Site Request Forgery (CSRF)** end to end:
 first by building a form that is vulnerable to it, then by fixing it with CSRF
@@ -44,10 +44,6 @@ the *action* to happen, email changed, money moved, password reset.
 
 **Impact:** account takeover (change the email → reset the password), money
 transfer, changing settings, any action the user is allowed to do.
-
-**OWASP:** CSRF was its own category (A8) in the OWASP Top Ten 2013; in 2021 it
-is part of **A01 Broken Access Control**. See the
-[OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
 
 ---
 
